@@ -1,0 +1,338 @@
+let imgPencil;
+let imgEraser;
+let letter_size = 20;
+var current_state;
+var write_pos = {x:50,y:25}
+
+var textToWrite = "ABCDEFG";
+
+var letterWritten = [];
+var letterIndex = 0;
+var states = { 
+               INITIAL         :"",
+               COMMUNITY       :"community",
+               EMPTY_HAND      :"foreign",
+               PENCIL_HELD     :"suscepitible",
+               PENCIL_PAPER    :"Exposed",
+               LETTER_WRITTEN  :"Infectious",
+               WRONG_LETTER    :"Dead",
+               LETTER_ERASED   :"Letter erased",
+               ERASER_PAPER    :"Recovered",
+               ERASER_HELD     :"Vaccine",
+               DONE            :""
+             };
+
+var actions = {
+               "increase":["EMPTY_HAND","PENCIL_HELD"],
+               "Place pencil":["PENCIL_HELD","PENCIL_PAPER"],
+               "Write a letter":["PENCIL_PAPER","LETTER_WRITTEN"],
+               "Lift pencil [Correct]":["LETTER_WRITTEN","PENCIL_HELD"],
+               "[Finished writing]":["LETTER_WRITTEN","DONE"],
+               "Wrong":["LETTER_WRITTEN","WRONG_LETTER"],
+               "Drop pencil":["PENCIL_HELD","EMPTY_HAND"],
+               "Drop pencil ":["WRONG_LETTER","EMPTY_HAND"],
+               "Pick eraser":["EMPTY_HAND","ERASER_HELD"],
+               "Place eraser":["ERASER_HELD","ERASER_PAPER"],
+               "Erase the letter":["ERASER_PAPER","LETTER_ERASED"],
+               "Drop eraser":["LETTER_ERASED","EMPTY_HAND"],
+               
+              };
+
+var images = {};
+
+function preload(){
+  images = { 
+            EMPTY_HAND     : loadImage('hold.png'),
+            PENCIL_HELD    : loadImage('pencil.png'),
+            PENCIL_PAPER   : loadImage('draw.png'),
+            WRITING        : loadImage('draw.png'),
+            LETTER_WRITTEN : loadImage('draw.png'),
+            WRONG_LETTER   : loadImage('draw.png'),
+            ERASER_PAPER   : loadImage('eraser.png'),
+            ERASER_HELD    : loadImage('self-collect.png'),
+            PENCIL_PLACED  : loadImage('edit.png'),
+            ERASER_PLACED  : loadImage('clean.png')
+           };
+}
+
+function setup() {
+  createCanvas(1200, 670);
+  buildStateMachine();
+  
+  setGraphics();
+  current_state = states.EMPTY_HAND;
+  states.DONE.finalState = true;
+  states.INITIAL.startState = true;
+}
+
+
+function mousePressed(){
+  for(var action of  current_state.actions)
+    action.clicked();
+}
+function drawTitle()
+{
+  drawingContext.save();
+  
+  fill(0);
+  textSize(30);
+  text("STATE DIAGRAM",900,50);
+  
+  drawingContext.restore();
+}
+
+function draw() {
+  background(230,230,230);
+  drawPaper();
+  drawTitle();
+  for(var alphabet of letterWritten)
+  {
+    alphabet.draw();
+  }
+  
+  drawDashboard();
+  drawStateDiagram();
+  drawIconByState();
+ 
+}
+function drawDashboard(){
+  fill(color(0,0,0));
+  drawingContext.save();
+  textSize(15)
+  text("Click on the below transitions to change state:",20,415);
+  noStroke();
+  fill(color(60,60,60));
+  rect(20,420,350,200);
+  
+  var position = {xCenter :350/2,y:460};
+  for(var action of current_state.actions)
+  {
+    if(action.name == "Lift pencil [Correct]" && 
+    textToWrite.length == letterWritten.length)
+      continue;
+    if(action.name == "[Finished writing]" && 
+    textToWrite.length != letterWritten.length)
+      continue;
+      
+     if(action.name == "Pick eraser" && 
+    0 == letterWritten.length)
+      continue;
+      
+      
+    action.drawButton(position);
+    position.y +=50;
+  }
+   drawingContext.restore();
+  
+}
+
+function drawPaper()
+{
+  stroke(0);
+  fill(color(255));
+  rect(20,20,250,350);
+}
+
+function drawStateDiagram(){
+  //draw nodes
+  
+ // states.INITIAL.drawNode(635,10);
+  states.COMMUNITY.drawNode(685,70);
+  states.EMPTY_HAND.drawNode(590,70);
+  states.PENCIL_HELD.drawNode(594,180);
+  states.PENCIL_PAPER.drawNode(580,280);
+  
+  states.LETTER_WRITTEN.drawNode(590,380);
+  states.WRONG_LETTER.drawNode(827,380);
+  states.ERASER_PAPER.drawNode(582,520);
+  //states.LETTER_ERASED.drawNode(947,520);
+  states.ERASER_HELD.drawNode(397,380);
+  //states.DONE.drawNode(802,480);
+  
+  connect(states.ERASER_HELD.connector.bottomright,states.ERASER_PAPER.connector.left);
+  
+  connect(states.LETTER_WRITTEN.connector.bottomright,states.ERASER_PAPER.connector.topright);
+        connect(states.ERASER_PAPER.connector.topleft,states.LETTER_WRITTEN.connector.bottomleft);
+  
+  connect(states.LETTER_WRITTEN.connector.right,states.WRONG_LETTER.connector.left);
+  connect(states.WRONG_LETTER.connector.bottomleft,states.LETTER_WRITTEN.connector.bottomright);
+  
+  connect(states.LETTER_WRITTEN.connector.left,states.ERASER_HELD.connector.right);
+  connect(states.ERASER_HELD.connector.bottomright,states.LETTER_WRITTEN.connector.bottomleft);
+  //connect(states.ERASER_HELD.connector.right,states.PENCIL_PAPER.connector.left);
+  
+  //connect(states.INITIAL.connector.bottom,states.EMPTY_HAND.connector.top);
+  //connect(states.INITIAL.connector.bottom,states.COMMUNITY.connector.top);
+  
+  connect(states.EMPTY_HAND.connector.bottomright,states.PENCIL_HELD.connector.topleft);
+  connect(states.COMMUNITY.connector.bottomright,states.PENCIL_HELD.connector.topright);
+  //connect(states.PENCIL_HELD.connector.topleft,states.EMPTY_HAND.connector.bottomleft);
+  connect(states.PENCIL_HELD.connector.bottomright,states.PENCIL_PAPER.connector.topright);
+  connect(states.PENCIL_PAPER.connector.topleft,states.PENCIL_HELD.connector.bottomleft);
+  
+  connect(states.PENCIL_PAPER.connector.bottomright,states.LETTER_WRITTEN.connector.topright);
+  connect(states.LETTER_WRITTEN.connector.topleft,states.PENCIL_PAPER.connector.bottomleft);
+  
+  
+
+  //connect(states.LETTER_WRITTEN.connector.right,states.WRONG_LETTER.connector.left);
+  //connect(states.EMPTY_HAND.connector.left,states.ERASER_HELD.connector.top,{
+   // x:2080 , y:280 });
+  //connect(states.LETTER_WRITTEN.connector.left,states.PENCIL_HELD.connector.left,
+   //      {
+   // x:2080 , y:1050 },'right');
+  //connect(states.ERASER_HELD.connector.right,states.ERASER_PAPER.connector.left);
+  //connect(states.LETTER_ERASED.connector.top,states.EMPTY_HAND.connector.topright,{x:2000,y:4390},'down');
+//connect(states.WRONG_LETTER.connector.top,states.EMPTY_HAND.connector.right,{x:600,y:1590},'left');
+
+  //connect(states.LETTER_WRITTEN.connector.bottom,states.DONE.connector.left,{x:950,y:100},'right');
+
+  //connect(states.ERASER_PAPER.connector.right,states.LETTER_ERASED.connector.left);
+  
+  writeActionText();
+
+}
+
+function writeActionText()
+{
+  //fill(color(115));
+  strokeWeight(0.1);
+ // text("Start",612,46);
+  text("increase",692,156);
+  text("increase",580,156);
+  text("increase",655,256); 
+  text("decrease",555,256);
+  text("increase",672,356);
+  text("decrease",572,356);
+  text("increase",512,406);
+  
+  text("decrease",512,436);
+  
+  
+  text("increase",712,406);
+  
+  text("decrease",712,436);
+  
+  text("increase",642,496);
+  
+  text("decrease",572,496);
+  text("increase",512,496);
+  //text("Lift pencil [Correct]",429,306);
+  //text("[Finished writing]",684,476);
+ // text("[Wrong]",750,400);
+  //text("Pick eraser/[letters>0]",419,206);
+  //text("Place eraser",505,536);
+  //text("Erase the letter",785,536);
+  //text("Drop pencil",815,216);
+  //text("Drop eraser",812,116);
+  
+}
+
+function connect(from,to,curvePoint,arrow_dir){
+    stroke(0);
+  
+    strokeWeight(0.5);
+    if(!curvePoint)
+        line(from.x, from.y, to.x, to.y);
+    else
+    {
+       noFill();
+        curve(curvePoint.x,curvePoint.y,from.x, from.y, to.x, to.y,from.x,from.y);
+    }
+    
+  fill(0);
+    if(from.y < to.y && !arrow_dir || arrow_dir == 'down')
+        triangle(to.x, to.y, to.x-4, to.y-4, to.x+4, to.y-4);
+    else if(from.y > to.y && !arrow_dir || arrow_dir == 'up')
+       triangle(to.x, to.y, to.x+4, to.y+4 , to.x-4, to.y+4);
+    else 
+        if(from.x < to.x && !arrow_dir || arrow_dir == 'right')
+            triangle(to.x, to.y, to.x-4, to.y-4 , to.x-4, to.y+4);
+        else
+            triangle(to.x, to.y, to.x+4, to.y-4 , to.x+4, to.y+4);
+    
+}
+
+
+
+function buildStateMachine(){
+  for (const [key, value] of Object.entries(states)) {
+    states[key] = new State(value,[]);
+  }
+  
+  for (const [key, value] of Object.entries(actions)) {
+    var action = new Action(key,states[value[1]]);
+    states[value[0]].actions.push(action);
+  }
+}
+
+function setGraphics(){
+    for (const [key, value] of Object.entries(states)) {
+       switch(key){
+         case "EMPTY_HAND":
+           states[key].drawGraphic = () =>{
+               image(images.EMPTY_HAND,290,20,50,50);
+               image(images.PENCIL_PLACED,290,90,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+           };
+           break;
+         case "PENCIL_HELD":
+           states[key].drawGraphic = () =>{
+               image(images.PENCIL_HELD,290,20,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+           };
+           break;
+         case "PENCIL_PAPER":
+           states[key].drawGraphic = () =>{
+               image(images.PENCIL_PAPER,write_pos.x + letter_size,write_pos.y,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+           };
+           break;
+         case "LETTER_WRITTEN":
+           states[key].drawGraphic = () =>{
+               image(images.PENCIL_PAPER,write_pos.x + letter_size,write_pos.y,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+           };
+           break;
+         case "WRONG_LETTER":
+           states[key].drawGraphic = () =>{
+               image(images.PENCIL_PAPER,write_pos.x + letter_size,write_pos.y,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+           };
+           break; 
+         case "LETTER_ERASED":
+           states[key].drawGraphic = () =>{
+            image(images.ERASER_PAPER,write_pos.x,write_pos.y,50,50);
+               image(images.PENCIL_PLACED,290,90,50,50);
+           };
+           break;
+         case "ERASER_PAPER":
+           states[key].drawGraphic = () =>{
+               image(images.ERASER_PAPER,write_pos.x,write_pos.y,50,50);
+               image(images.PENCIL_PLACED,290,90,50,50);
+           };  
+           break; 
+          case "ERASER_HELD":
+           states[key].drawGraphic = () =>{
+               image(images.ERASER_HELD,290,20,50,50);
+               image(images.PENCIL_PLACED,290,90,50,50);
+           };
+           break;
+          case "DONE":
+            states[key].drawGraphic = () =>{
+               image(images.EMPTY_HAND,290,20,50,50);
+               image(images.PENCIL_PLACED,290,90,50,50);
+               image(images.ERASER_PLACED,290,160,50,50);
+            };
+            break;
+          default:
+           break;
+       }
+  }
+}
+
+function drawIconByState() {
+       current_state.drawGraphic();
+}
+
+
